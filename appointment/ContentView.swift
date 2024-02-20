@@ -66,7 +66,6 @@ struct LoginView: View {
                 GridView()
             }
             .alert(isPresented: $showError) {
-                // Show alert for incorrect username or password
                 Alert(title: Text("Error"), message: Text("Wrong username or password"), dismissButton: .default(Text("OK")))
             }
         }
@@ -105,10 +104,71 @@ extension UIColor {
 
 
 struct GridView: View {
+
+    @State private var currentDate = Date()
+    @State private var selectedDate: Date?
+    
     var body: some View {
-        // Your grid layout content goes here
-        Text("Grid Layout")
-            .font(.largeTitle)
-            .foregroundColor(.black)
+        ScrollView {
+            VStack {
+                Text(dayMonthYearFormatter.string(from: currentDate))
+                    .font(.largeTitle)
+                    .foregroundColor(.black)
+                    .padding()
+                
+                LazyVGrid(columns: Array(repeating: GridItem(), count: 1), spacing: 10) {
+                    ForEach(dayHours(), id: \.self) { hour in
+                        Text(hourFormatter.string(from: hour))
+                            .frame(width: 100, height: 30)
+                            .foregroundColor(.black)
+                            .padding(.horizontal)
+                    }
+                }
+                
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        currentDate = Calendar.current.date(byAdding: .day, value: -1, to: currentDate)!
+                    }) {
+                        Text("Back")
+                    }
+                    
+                    Button(action: {
+                        currentDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate)!
+                    }) {
+                        Text("Next")
+                    }
+                    Spacer()
+                }
+                .padding(.top)
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private var dayMonthYearFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        return formatter
+    }
+    
+    private var hourFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h a"
+        return formatter
+    }
+    
+    private func dayHours() -> [Date] {
+        let calendar = Calendar.current
+        var dateComponents = calendar.dateComponents([.year, .month, .day], from: currentDate)
+        var hours: [Date] = []
+        for hour in 0..<24 {
+            dateComponents.hour = hour
+            if let date = calendar.date(from: dateComponents) {
+                hours.append(date)
+            }
+        }
+        return hours
     }
 }
