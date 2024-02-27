@@ -17,7 +17,6 @@ struct ContentView: View {
                 Spacer()
             }
             .navigationBarTitle("Appointment", displayMode: .large)
-            .background(Color("BackgroundColor")) // Ensure you have this color defined in your assets
             .sheet(isPresented: $showLoginScreen) {
                 LoginView()
             }
@@ -43,8 +42,6 @@ struct LoginView: View {
                     .textFieldStyle(RoundedBorderTextFieldStyle())
 
                 Button("Login/Sign up") {
-                    // Authentication logic here
-                    // For simplicity, using static credentials
                     if username == "Jzr" && password == "1234" {
                         isLoggedIn = true
                     } else {
@@ -58,7 +55,7 @@ struct LoginView: View {
                 .background(Color.blue)
                 .cornerRadius(10)
                 .fullScreenCover(isPresented: $isLoggedIn) {
-                    GridView() // Assuming GridView remains unchanged
+                    GridView()
                 }
                 .alert(isPresented: $showError) {
                     Alert(title: Text("Error"), message: Text("Wrong username or password"), dismissButton: .default(Text("OK")))
@@ -66,76 +63,67 @@ struct LoginView: View {
             }
             .navigationBarTitle("Login/Sign Up", displayMode: .inline)
             .padding()
-            .background(Color("BackgroundColor")) // Use the same background color
         }
     }
 }
 
-
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-    }
-}
-
-extension UIColor {
-    convenience init(hex: String, alpha: CGFloat = 1.0) {
-        let hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "#", with: "")
-        var rgb: UInt64 = 0
-        Scanner(string: hexSanitized).scanHexInt64(&rgb)
-
-        let red = CGFloat((rgb & 0xFF0000) >> 16) / 255.0
-        let green = CGFloat((rgb & 0x00FF00) >> 8) / 255.0
-        let blue = CGFloat(rgb & 0x0000FF) / 255.0
-
-        self.init(red: 0.5568627450980392, green: 0.6980392156862745, blue: 0.3607843137254902, alpha: 1.0)
-    }
-}
-
-
-
 struct GridView: View {
     @State private var currentDate = Date()
-    @Environment(\.presentationMode) var presentationMode // For dismissing the view
+    @Environment(\.presentationMode) var presentationMode
+    @State private var selectedTime: Date?
+    @State private var isTimeDetailPresented = false
+
+    private var dayMonthYearFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d, yyyy"
+        return formatter
+    }
+
+    private var hourFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h a"
+        return formatter
+    }
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack {
-                    Text(dayMonthYearFormatter.string(from: currentDate))
-                        .font(.title)
-                        .foregroundColor(.primary) // Using .primary for adaptability with dark mode
-                        .padding()
+                    HStack {
+                        Button(action: {
+                            self.changeDate(by: -1)
+                        }) {
+                            Image(systemName: "chevron.left")
+                        }
+
+                        Text(dayMonthYearFormatter.string(from: currentDate))
+                            .font(.title)
+
+                        Button(action: {
+                            self.changeDate(by: 1)
+                        }) {
+                            Image(systemName: "chevron.right")
+                        }
+                    }
+                    .foregroundColor(.primary)
+                    .padding()
 
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 20) {
                         ForEach(dayHours(), id: \.self) { hour in
-                            Text(hourFormatter.string(from: hour))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(10)
-                                .padding(.horizontal)
+                            Button(action: {
+                                self.selectedTime = hour
+                                self.isTimeDetailPresented = true
+                            }) {
+                                Text(hourFormatter.string(from: hour))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 50)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                            }
                         }
                     }
-
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            currentDate = Calendar.current.date(byAdding: .day, value: -1, to: currentDate)!
-                        }) {
-                            Label("", systemImage: "chevron.left")
-                        }
-
-                        Button(action: {
-                            currentDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate)!
-                        }) {
-                            Label("", systemImage: "chevron.right")
-                        }
-                        Spacer()
-                    }
-                    .padding()
+                    .padding(.horizontal)
                 }
                 .navigationBarTitle("Appointments", displayMode: .inline)
                 .navigationBarItems(leading: Button(action: {
@@ -145,21 +133,22 @@ struct GridView: View {
                 })
                 .padding()
             }
+            .sheet(isPresented: $isTimeDetailPresented, onDismiss: {
+                // Reset the selected time when the detail view is dismissed
+                self.selectedTime = nil
+            }) {
+                if let selectedTime = self.selectedTime {
+                    TimeDetailView(time: selectedTime)
+                }
+            }
         }
     }
-    
-    private var dayMonthYearFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMM d, yyyy"
-        return formatter
+
+    private func changeDate(by days: Int) {
+        guard let newDate = Calendar.current.date(byAdding: .day, value: days, to: currentDate) else { return }
+        currentDate = newDate
     }
-    
-    private var hourFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h a"
-        return formatter
-    }
-    
+
     private func dayHours() -> [Date] {
         let calendar = Calendar.current
         var dateComponents = calendar.dateComponents([.year, .month, .day], from: currentDate)
@@ -171,5 +160,45 @@ struct GridView: View {
             }
         }
         return hours
+    }
+}
+
+struct TimeDetailView: View {
+    var time: Date
+
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }
+
+    var body: some View {
+        VStack {
+            Text("Selected Time")
+                .font(.headline)
+                .padding()
+            Text(timeFormatter.string(from: time))
+                .font(.title)
+                .padding()
+            Button("Reserve") {
+                // Call function to send event details to your backend
+                reserveTimeSlot()
+            }
+            .padding()
+            .foregroundColor(.white)
+            .background(Color.blue)
+            .cornerRadius(10)
+        }
+    }
+
+    func reserveTimeSlot() {
+        // Implement the network request to your backend server or cloud function
+        // The backend then creates the Google Calendar event and sends the invitation
+    }
+}
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
     }
 }
