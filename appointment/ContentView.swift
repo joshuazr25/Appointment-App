@@ -1,4 +1,43 @@
 import SwiftUI
+import UIKit
+import MessageUI
+
+struct MailView: UIViewControllerRepresentable {
+    @Environment(\.presentationMode) var presentation
+    var toRecipients: [String]
+    var subject: String
+    var messageBody: String
+
+    func makeUIViewController(context: UIViewControllerRepresentableContext<MailView>) -> MFMailComposeViewController {
+        let vc = MFMailComposeViewController()
+        vc.mailComposeDelegate = context.coordinator
+        vc.setToRecipients(toRecipients)
+        vc.setSubject(subject)
+        vc.setMessageBody(messageBody, isHTML: false)
+        return vc
+    }
+    
+    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: UIViewControllerRepresentableContext<MailView>) {
+        
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        var parent: MailView
+        
+        init(_ parent: MailView) {
+            self.parent = parent
+        }
+        
+        func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+            parent.presentation.wrappedValue.dismiss()
+        }
+    }
+}
+
 
 struct ContentView: View {
     @State private var showLoginScreen = false
@@ -165,6 +204,7 @@ struct GridView: View {
 
 struct TimeDetailView: View {
     var time: Date
+    @State private var showingEmailComposer = false
 
     private var timeFormatter: DateFormatter {
         let formatter = DateFormatter()
@@ -173,32 +213,112 @@ struct TimeDetailView: View {
     }
 
     var body: some View {
-        VStack {
-            Text("Selected Time")
-                .font(.headline)
+            VStack {
+                Text("Selected Time")
+                    .font(.headline)
+                    .padding()
+                Text(timeFormatter.string(from: time))
+                    .font(.title)
+                    .padding()
+                Button("Reserve") {
+                    self.showingEmailComposer = true
+                }
                 .padding()
-            Text(timeFormatter.string(from: time))
-                .font(.title)
-                .padding()
-            Button("Reserve") {
-                // Call function to send event details to your backend
-                reserveTimeSlot()
+                .foregroundColor(.white)
+                .background(Color.blue)
+                .cornerRadius(10)
+                .sheet(isPresented: $showingEmailComposer) {
+                    EmailComposerView()
+                }
             }
-            .padding()
-            .foregroundColor(.white)
-            .background(Color.blue)
-            .cornerRadius(10)
         }
     }
+struct EmailComposerView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIViewController {
+        guard MFMailComposeViewController.canSendMail() else {
+            // If the device is unable to send email, present a fallback view controller
+            return UIHostingController(rootView: Text("Cannot send emails from this device."))
+        }
+        let mailComposer = MFMailComposeViewController()
+        mailComposer.setToRecipients(["lreyter336@milkenschool.org"]) // Change to your email address
+        mailComposer.setSubject("Appointment Reservation")
+        mailComposer.setMessageBody("I would like to reserve an appointment for...", isHTML: false)
+        return mailComposer
+    }
+    
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        // No need to update the view controller in this context
+    }
+    
+    class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+        func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+            controller.dismiss(animated: true)
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        return Coordinator()
+    }
+}
 
     func reserveTimeSlot() {
         // Implement the network request to your backend server or cloud function
         // The backend then creates the Google Calendar event and sends the invitation
     }
-}
+
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
+    }
+}
+
+
+class YourViewController: UIViewController, MFMailComposeViewControllerDelegate {
+    
+    // Function to handle email sending
+    func sendEmail() {
+    guard MFMailComposeViewController.canSendMail() else {
+        return // Handle the case where the device is not configured for sending emails
+    }
+        
+        let mailComposer = MFMailComposeViewController()
+        mailComposer.mailComposeDelegate = self
+        mailComposer.setToRecipients(["Jzr25@icloud.com"])
+        mailComposer.setSubject("Subject of your email")
+        mailComposer.setMessageBody("Body of your email", isHTML: false)
+        
+        // Present the view controller
+        if let rootViewController = UIApplication.shared.keyWindow?.rootViewController {
+            rootViewController.present(mailComposer, animated: true, completion: nil)
+        }
+    }
+    
+    // Handle delegate methods for MFMailComposeViewControllerDelegate
+    func mailComposeController(_ controller: MFMailComposeViewController, didFinishWith result: MFMailComposeResult, error: Error?) {
+        controller.dismiss(animated: true, completion: nil)
+        
+        // Handle the result of the email composition
+        switch result {
+        case .cancelled:
+            print("Email composition cancelled")
+        case .saved:
+            print("Email saved as a draft")
+        case .sent:
+            print("Email sent successfully")
+        case .failed:
+            if let error = error {
+                print("Email composition failed with error: \(error.localizedDescription)")
+            } else {
+                print("Email composition failed")
+            }
+        @unknown default:
+            fatalError("Unhandled MFMailComposeResult case")
+        }
+    }
+    
+    // Call the Email Sending Functionality from a button action, for example
+    @IBAction func sendButtonTapped(_ sender: UIButton) {
+        sendEmail()
     }
 }
